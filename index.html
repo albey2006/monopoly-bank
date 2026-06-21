@@ -13,7 +13,6 @@ body { font-family:sans-serif; background:#121212; color:white; margin:0; paddin
 .hide { display:none; }
 button { width:100%; padding:10px; margin-top:5px; background:#cf1020; color:white; border:none; border-radius:5px; }
 input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box; }
-.smallbtn { width:auto; padding:6px 10px; margin:3px; background:#333; }
 </style>
 </head>
 
@@ -33,14 +32,6 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 <h3>Room Code</h3>
 <div id="roomText"></div>
 <div id="qr"></div>
-</div>
-
-<div class="card">
-<h3>Game Mode</h3>
-<select id="mode">
-<option value="monopoly">Monopoly</option>
-<option value="ukopoly">UK-Opoly</option>
-</select>
 </div>
 
 <div class="card">
@@ -99,7 +90,9 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 
 <select id="toName"></select>
 <input id="amt" type="number" placeholder="Amount">
+
 <button onclick="sendMoney()">Send Money</button>
+<button onclick="payBank()">Pay Bank</button>
 
 </div>
 
@@ -118,12 +111,9 @@ P5:{name:"",balance:1500},
 P6:{name:"",balance:1500}
 };
 
-let bank = { balance: 100000 }; // large system bank
-
 let peer, conn, roomId;
 let connections = [];
 let myId = "";
-
 let transactions = [];
 
 /* ================= HOST ================= */
@@ -156,7 +146,7 @@ c.on("open", broadcast);
 renderHost();
 }
 
-/* ================= PHONE ================= */
+/* ================= PHONE CONNECT ================= */
 
 const room = new URLSearchParams(location.search).get("room");
 
@@ -210,7 +200,7 @@ document.getElementById("wallet").classList.remove("hide");
 renderPhone();
 }
 
-/* ================= PLAYER SEND ================= */
+/* ================= PLAYER → PLAYER ================= */
 
 function sendMoney(){
 
@@ -225,22 +215,48 @@ from:myId,
 to:to,
 amount:amt
 });
+
+document.getElementById("amt").value = "";
+}
+
+/* ================= PLAYER → BANK (NEW) ================= */
+
+function payBank(){
+
+let amt = parseInt(document.getElementById("amt").value);
+let me = players[myId];
+
+if(!amt || amt <= 0) return;
+if(!me || me.balance < amt) return;
+
+me.balance -= amt;
+
+addLog(me.name, "BANK", amt);
+
+broadcast();
+renderHost();
+renderPhone();
+
+document.getElementById("amt").value = "";
 }
 
 /* ================= PASS GO ================= */
 
 function passGo(){
+
 let p = players[myId];
 if(!p) return;
 
 p.balance += 200;
+
 addLog("BANK", p.name, 200);
+
 broadcast();
 renderHost();
 renderPhone();
 }
 
-/* ================= BANK PAY ================= */
+/* ================= BANK → PLAYER ================= */
 
 function bankPay(){
 
@@ -270,7 +286,6 @@ if(cmd.type==="SET_NAME"){
 players[cmd.player].name = cmd.name;
 }
 
-/* PLAYER → PLAYER */
 if(cmd.type==="TRANSFER"){
 
 let from = players[cmd.from];
@@ -326,7 +341,6 @@ div.innerHTML += `
 </div>`;
 }
 
-/* dropdown */
 let sel = document.getElementById("bankTo");
 if(sel){
 sel.innerHTML = "";
@@ -347,7 +361,6 @@ let me = players[myId];
 document.getElementById("me").innerText = me.name;
 document.getElementById("bal").innerText = "$" + me.balance;
 
-/* ONLY PLAYERS */
 let sel = document.getElementById("toName");
 sel.innerHTML = "";
 
@@ -356,7 +369,6 @@ if(i !== myId){
 sel.innerHTML += `<option value="${i}">${players[i].name}</option>`;
 }
 }
-
 }
 
 /* ================= BROADCAST ================= */
