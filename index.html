@@ -21,7 +21,7 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 
 <!-- HOST -->
 <div id="host">
-<h2>Monopoly Banker System</h2>
+<h2>Monopoly Banker Core</h2>
 
 <div class="card">
 <button onclick="startHost()">Start Game</button>
@@ -36,8 +36,17 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 </div>
 
 <div class="card">
-<h3>Players + Bank</h3>
+<h3>Players</h3>
 <div id="players"></div>
+</div>
+
+<div class="card">
+<h3>🏦 Bank Control</h3>
+
+<select id="bankTo"></select>
+<input id="bankAmt" type="number" placeholder="Amount">
+<button onclick="bankPay()">Send Money From Bank</button>
+
 </div>
 
 <div class="card">
@@ -83,11 +92,10 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 <h2 id="me"></h2>
 <h1 id="bal"></h1>
 
+<!-- 🚫 ONLY PLAYERS (NO BANK) -->
 <select id="toName"></select>
 <input id="amt" type="number" placeholder="Amount">
 <button onclick="sendMoney()">Send Money</button>
-
-<button onclick="requestBank()">Request Money from Bank</button>
 
 </div>
 
@@ -103,22 +111,21 @@ P2:{name:"",balance:1500},
 P3:{name:"",balance:1500},
 P4:{name:"",balance:1500},
 P5:{name:"",balance:1500},
-P6:{name:"",balance:1500},
-
-// 🏦 BANK
-P7:{name:"BANK",balance:9000}
+P6:{name:"",balance:1500}
 };
+
+/* 🏦 BANK (SYSTEM ONLY) */
+let bank = { balance: 9000 };
 
 let peer, conn, roomId;
 let connections = [];
 let myId = "";
 
-/* ================= LOG SYSTEM ================= */
-
+/* LOG */
 let transactions = [];
 let logFilter = "all";
 
-/* ================= HOST START ================= */
+/* ================= HOST ================= */
 
 function startHost(){
 
@@ -148,7 +155,7 @@ c.on("open", broadcast);
 renderHost();
 }
 
-/* ================= PHONE CONNECT ================= */
+/* ================= PHONE ================= */
 
 const room = new URLSearchParams(location.search).get("room");
 
@@ -202,7 +209,7 @@ document.getElementById("wallet").classList.remove("hide");
 renderPhone();
 }
 
-/* ================= SEND MONEY ================= */
+/* ================= PLAYER SEND (NO BANK ACCESS) ================= */
 
 function sendMoney(){
 
@@ -219,20 +226,26 @@ amount:amt
 });
 }
 
-/* ================= REQUEST BANK ================= */
+/* ================= BANK SEND ================= */
 
-function requestBank(){
+function bankPay(){
 
-let amt = prompt("Request from Bank:");
-amt = parseInt(amt);
+let to = document.getElementById("bankTo").value;
+let amt = parseInt(document.getElementById("bankAmt").value);
 
 if(!amt || amt<=0) return;
 
-conn.send({
-type:"BANK_SEND",
-to: myId,
-amount: amt
-});
+let target = players[to];
+
+if(bank.balance >= amt && target){
+
+bank.balance -= amt;
+target.balance += amt;
+
+addLog("BANK", target.name, amt);
+broadcast();
+renderHost();
+}
 }
 
 /* ================= HOST LOGIC ================= */
@@ -243,35 +256,18 @@ if(cmd.type==="SET_NAME"){
 players[cmd.player].name = cmd.name;
 }
 
-/* PLAYER + BANK TRANSFER */
+/* PLAYER → PLAYER ONLY */
 if(cmd.type==="TRANSFER"){
 
 let from = players[cmd.from];
 let to = players[cmd.to];
 
-if(from.balance >= cmd.amount && to){
+if(from && to && from.balance >= cmd.amount){
 
 from.balance -= cmd.amount;
 to.balance += cmd.amount;
 
 addLog(from.name, to.name, cmd.amount);
-
-}
-}
-
-/* BANK SEND */
-if(cmd.type==="BANK_SEND"){
-
-let bank = players.P7;
-let to = players[cmd.to];
-
-if(bank.balance >= cmd.amount && to){
-
-bank.balance -= cmd.amount;
-to.balance += cmd.amount;
-
-addLog("BANK", to.name, cmd.amount);
-
 }
 }
 
@@ -279,14 +275,12 @@ broadcast();
 renderHost();
 }
 
-/* ================= LOGGING ================= */
+/* ================= LOG ================= */
 
 function addLog(from, to, amount){
 
-transactions.unshift({from, to, amount});
-
-if(transactions.length > 20) transactions.pop();
-
+transactions.unshift({from,to,amount});
+if(transactions.length > 30) transactions.pop();
 renderLog();
 }
 
@@ -302,12 +296,12 @@ log.innerHTML = "";
 
 transactions.forEach(t=>{
 
-if(logFilter === "bank"){
-if(t.from !== "BANK" && t.to !== "BANK") return;
+if(logFilter==="bank"){
+if(t.from!=="BANK" && t.to!=="BANK") return;
 }
 
-if(logFilter === "players"){
-if(t.from === "BANK" || t.to === "BANK") return;
+if(logFilter==="players"){
+if(t.from==="BANK" || t.to==="BANK") return;
 }
 
 log.innerHTML += `
@@ -332,6 +326,15 @@ div.innerHTML += `
 </div>`;
 }
 
+/* ONLY PLAYERS IN BANK DROPDOWN */
+let sel = document.getElementById("bankTo");
+if(sel){
+sel.innerHTML = "";
+for(let i in players){
+sel.innerHTML += `<option value="${i}">${players[i].name}</option>`;
+}
+}
+
 renderLog();
 }
 
@@ -344,7 +347,7 @@ let me = players[myId];
 document.getElementById("me").innerText = me.name;
 document.getElementById("bal").innerText = "$" + me.balance;
 
-/* dropdown includes BANK + players */
+/* ONLY PLAYERS (NO BANK OPTION) */
 let sel = document.getElementById("toName");
 sel.innerHTML = "";
 
