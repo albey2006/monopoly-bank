@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Monopoly / UK-Opoly Bank System</title>
+<title>Monopoly Bank System</title>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -13,7 +13,6 @@ body { font-family:sans-serif; background:#121212; color:white; margin:0; paddin
 .hide { display:none; }
 button { width:100%; padding:10px; margin-top:5px; background:#cf1020; color:white; border:none; border-radius:5px; }
 input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box; }
-.grid { display:grid; grid-template-columns:2fr 1fr; gap:10px; max-width:1100px; margin:auto; }
 .prop { padding:8px; background:#222; margin:4px 0; border-left:4px solid white; }
 </style>
 </head>
@@ -23,14 +22,9 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 <!-- ================= HOST ================= -->
 <div id="host">
 
-<h2>Monopoly Bank (HOST)</h2>
+<h2>Monopoly Banker</h2>
 
 <div class="card">
-<label>Board Type</label>
-<select id="boardType">
-<option value="classic">Classic Monopoly</option>
-<option value="uk">UK-Opoly</option>
-</select>
 <button onclick="startHost()">Start Game</button>
 </div>
 
@@ -42,16 +36,9 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 <div id="qr"></div>
 </div>
 
-<div class="grid">
 <div class="card">
 <h3>Players</h3>
 <div id="players"></div>
-</div>
-
-<div class="card">
-<h3>Properties</h3>
-<div id="properties"></div>
-</div>
 </div>
 
 </div>
@@ -60,11 +47,13 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 <!-- ================= PHONE ================= -->
 <div id="phone" class="hide">
 
-<h3>Player Wallet</h3>
+<h3>Wallet</h3>
+
 <p id="roomStatus"></p>
 
-<div class="card hide" id="nameSetup">
-<h3>Enter Nickname</h3>
+<div class="card hide" id="setup">
+
+<h3>Join Game</h3>
 
 <input id="nick" placeholder="Your name">
 
@@ -77,7 +66,8 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 <option value="P6">Slot 6</option>
 </select>
 
-<button onclick="joinGame()">Join Game</button>
+<button onclick="joinGame()">Join</button>
+
 </div>
 
 <div class="card hide" id="wallet">
@@ -85,7 +75,7 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 <h2 id="me"></h2>
 <h1 id="bal"></h1>
 
-<input id="toName" placeholder="Send to (nickname)">
+<select id="toName"></select>
 <input id="amt" type="number" placeholder="Amount">
 <button onclick="sendMoney()">Send Money</button>
 
@@ -95,28 +85,7 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 
 <script>
 
-/* ================= BOARDS ================= */
-
-const classic = {
-MED:{name:"Mediterranean Ave",cost:60,rent:2,color:"#955436",owner:null},
-BAL:{name:"Baltic Ave",cost:60,rent:4,color:"#955436",owner:null},
-KEN:{name:"Kentucky Ave",cost:220,rent:18,color:"#ed1c24",owner:null},
-BWD:{name:"Boardwalk",cost:400,rent:50,color:"#0054a6",owner:null}
-};
-
-const uk = {
-UK1:{name:"UK Main Campus",cost:120,rent:10,color:"#0033a0",owner:null},
-UK2:{name:"Memorial Coliseum",cost:140,rent:12,color:"#0033a0",owner:null},
-UK3:{name:"Wildcat Lodge",cost:160,rent:14,color:"#0055ff",owner:null},
-UK4:{name:"Medical Center",cost:180,rent:16,color:"#001f5b",owner:null},
-UK5:{name:"Student Union",cost:200,rent:18,color:"#0033a0",owner:null},
-UK6:{name:"Rupp Arena",cost:220,rent:20,color:"#0055ff",owner:null}
-};
-
-/* ================= STATE ================= */
-
-let peer, conn, roomId;
-let connections = [];
+/* ================= PLAYERS ================= */
 
 let players = {
 P1:{name:"",balance:1500},
@@ -127,7 +96,8 @@ P5:{name:"",balance:1500},
 P6:{name:"",balance:1500}
 };
 
-let properties = {};
+let peer, conn, roomId;
+let connections = [];
 let myId = "";
 
 /* ================= AUTO MODE ================= */
@@ -145,14 +115,12 @@ connectPhone(room);
 
 function startHost(){
 
-let type = document.getElementById("boardType").value;
-properties = JSON.parse(JSON.stringify(type==="uk"?uk:classic));
-
 roomId = "MONO-" + Math.random().toString(36).substring(2,6).toUpperCase();
 
 peer = new Peer(roomId);
 
 peer.on("open", () => {
+
 document.getElementById("hostPanel").classList.remove("hide");
 document.getElementById("roomText").innerText = roomId;
 
@@ -161,6 +129,7 @@ text: location.href + "?room=" + roomId,
 width:120,
 height:120
 });
+
 });
 
 peer.on("connection", c=>{
@@ -182,12 +151,11 @@ peer.on("open", ()=>{
 conn = peer.connect(room);
 
 conn.on("open", ()=>{
-document.getElementById("nameSetup").classList.remove("hide");
+document.getElementById("setup").classList.remove("hide");
 });
 
 conn.on("data", data=>{
 players = data.players;
-properties = data.properties;
 
 if(myId){
 document.getElementById("wallet").classList.remove("hide");
@@ -212,17 +180,17 @@ player:myId,
 name:name
 });
 
-document.getElementById("nameSetup").classList.add("hide");
+document.getElementById("setup").classList.add("hide");
 document.getElementById("wallet").classList.remove("hide");
 
 renderPhone();
 }
 
-/* ================= SEND MONEY ================= */
+/* ================= SEND ================= */
 
 function sendMoney(){
 
-let to = document.getElementById("toName").value.trim();
+let to = document.getElementById("toName").value;
 let amt = parseInt(document.getElementById("amt").value);
 
 if(!amt || amt<=0) return;
@@ -243,25 +211,35 @@ if(cmd.type==="SET_NAME"){
 players[cmd.player].name = cmd.name;
 }
 
+/* transfer */
 if(cmd.type==="TRANSFER_NAME"){
 
 let from = players[cmd.from];
 
-let toId = Object.keys(players).find(p=>
+let toId = Object.keys(players).find(p =>
 players[p].name.toLowerCase() === cmd.toName.toLowerCase()
 );
 
-if(toId && from.balance>=cmd.amount){
+if(toId && from.balance >= cmd.amount){
 from.balance -= cmd.amount;
 players[toId].balance += cmd.amount;
 }
+
 }
 
 broadcast();
 renderHost();
 }
 
-/* ================= RENDER ================= */
+/* ================= PASS GO ================= */
+
+function passGo(id){
+players[id].balance += 200;
+broadcast();
+renderHost();
+}
+
+/* ================= RENDER HOST ================= */
 
 function renderHost(){
 
@@ -269,16 +247,17 @@ let p = document.getElementById("players");
 p.innerHTML = "";
 
 for(let i in players){
-p.innerHTML += `<div>${players[i].name||i} - $${players[i].balance}</div>`;
+
+p.innerHTML += `
+<div style="margin:5px 0; padding:8px; background:#222;">
+<b>${players[i].name || i}</b> - $${players[i].balance}
+<button onclick="passGo('${i}')">+200 Pass GO</button>
+</div>`;
 }
 
-let pr = document.getElementById("properties");
-pr.innerHTML = "";
+}
 
-for(let i in properties){
-pr.innerHTML += `<div class="prop">${properties[i].name}</div>`;
-}
-}
+/* ================= RENDER PHONE ================= */
 
 function renderPhone(){
 
@@ -286,13 +265,24 @@ let me = players[myId];
 
 document.getElementById("me").innerText = me.name;
 document.getElementById("bal").innerText = "$" + me.balance;
+
+/* dropdown */
+let sel = document.getElementById("toName");
+sel.innerHTML = `<option value="Bank">Bank</option>`;
+
+for(let i in players){
+if(i !== myId){
+sel.innerHTML += `<option value="${players[i].name}">${players[i].name}</option>`;
+}
+}
+
 }
 
 /* ================= BROADCAST ================= */
 
 function broadcast(){
 connections.forEach(c=>{
-if(c.open) c.send({players,properties});
+if(c.open) c.send({players});
 });
 }
 
