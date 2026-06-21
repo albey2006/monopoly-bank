@@ -13,13 +13,15 @@ body { font-family:sans-serif; background:#121212; color:white; margin:0; paddin
 .hide { display:none; }
 button { width:100%; padding:10px; margin-top:5px; background:#cf1020; color:white; border:none; border-radius:5px; }
 input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box; }
+.smallbtn { width:auto; padding:6px 10px; margin:3px; background:#333; }
 </style>
 </head>
 
 <body>
 
+<!-- HOST -->
 <div id="host">
-<h2>Monopoly Banker</h2>
+<h2>Monopoly Banker System</h2>
 
 <div class="card">
 <button onclick="startHost()">Start Game</button>
@@ -34,13 +36,24 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 </div>
 
 <div class="card">
-<h3>Accounts</h3>
+<h3>Players + Bank</h3>
 <div id="players"></div>
 </div>
 
+<div class="card">
+<h3>Transaction Log</h3>
+
+<button class="smallbtn" onclick="setFilter('all')">All</button>
+<button class="smallbtn" onclick="setFilter('bank')">Bank Only</button>
+<button class="smallbtn" onclick="setFilter('players')">Players Only</button>
+
+<div id="log"></div>
+</div>
+
 </div>
 </div>
 
+<!-- PHONE -->
 <div id="phone" class="hide">
 
 <h3>Wallet</h3>
@@ -74,6 +87,8 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 <input id="amt" type="number" placeholder="Amount">
 <button onclick="sendMoney()">Send Money</button>
 
+<button onclick="requestBank()">Request Money from Bank</button>
+
 </div>
 
 </div>
@@ -90,13 +105,18 @@ P4:{name:"",balance:1500},
 P5:{name:"",balance:1500},
 P6:{name:"",balance:1500},
 
-// 🏦 BANK (new real account)
-P7:{name:"BANK",balance:0}
+// 🏦 BANK
+P7:{name:"BANK",balance:9000}
 };
 
 let peer, conn, roomId;
 let connections = [];
 let myId = "";
+
+/* ================= LOG SYSTEM ================= */
+
+let transactions = [];
+let logFilter = "all";
 
 /* ================= HOST START ================= */
 
@@ -110,9 +130,6 @@ peer.on("open", () => {
 
 document.getElementById("hostPanel").classList.remove("hide");
 document.getElementById("roomText").innerText = roomId;
-
-/* BANK STARTING MONEY = 6 players × 1500 = 9000 */
-players.P7.balance = 9000;
 
 new QRCode(document.getElementById("qr"), {
 text: location.href + "?room=" + roomId,
@@ -197,8 +214,24 @@ if(!amt || amt<=0) return;
 conn.send({
 type:"TRANSFER",
 from:myId,
-toName:to,
+to:to,
 amount:amt
+});
+}
+
+/* ================= REQUEST BANK ================= */
+
+function requestBank(){
+
+let amt = prompt("Request from Bank:");
+amt = parseInt(amt);
+
+if(!amt || amt<=0) return;
+
+conn.send({
+type:"BANK_SEND",
+to: myId,
+amount: amt
 });
 }
 
@@ -210,28 +243,79 @@ if(cmd.type==="SET_NAME"){
 players[cmd.player].name = cmd.name;
 }
 
-/* MONEY TRANSFER (NOW BANK IS REAL PLAYER P7) */
+/* PLAYER + BANK TRANSFER */
 if(cmd.type==="TRANSFER"){
 
 let from = players[cmd.from];
-let targetName = cmd.toName.toLowerCase();
+let to = players[cmd.to];
 
-if(from.balance >= cmd.amount){
+if(from.balance >= cmd.amount && to){
 
-// find recipient (player OR bank)
-let toId = Object.keys(players).find(p =>
-players[p].name.toLowerCase() === targetName
-);
-
-if(toId){
 from.balance -= cmd.amount;
-players[toId].balance += cmd.amount;
+to.balance += cmd.amount;
+
+addLog(from.name, to.name, cmd.amount);
+
 }
+}
+
+/* BANK SEND */
+if(cmd.type==="BANK_SEND"){
+
+let bank = players.P7;
+let to = players[cmd.to];
+
+if(bank.balance >= cmd.amount && to){
+
+bank.balance -= cmd.amount;
+to.balance += cmd.amount;
+
+addLog("BANK", to.name, cmd.amount);
+
 }
 }
 
 broadcast();
 renderHost();
+}
+
+/* ================= LOGGING ================= */
+
+function addLog(from, to, amount){
+
+transactions.unshift({from, to, amount});
+
+if(transactions.length > 20) transactions.pop();
+
+renderLog();
+}
+
+function setFilter(f){
+logFilter = f;
+renderLog();
+}
+
+function renderLog(){
+
+let log = document.getElementById("log");
+log.innerHTML = "";
+
+transactions.forEach(t=>{
+
+if(logFilter === "bank"){
+if(t.from !== "BANK" && t.to !== "BANK") return;
+}
+
+if(logFilter === "players"){
+if(t.from === "BANK" || t.to === "BANK") return;
+}
+
+log.innerHTML += `
+<div style="text-align:left; padding:5px; border-bottom:1px solid #333;">
+${t.from} → ${t.to} $${t.amount}
+</div>`;
+});
+
 }
 
 /* ================= HOST UI ================= */
@@ -247,6 +331,8 @@ div.innerHTML += `
 <b>${players[i].name}</b> - $${players[i].balance}
 </div>`;
 }
+
+renderLog();
 }
 
 /* ================= PHONE UI ================= */
@@ -258,13 +344,13 @@ let me = players[myId];
 document.getElementById("me").innerText = me.name;
 document.getElementById("bal").innerText = "$" + me.balance;
 
-/* dropdown includes BANK now */
+/* dropdown includes BANK + players */
 let sel = document.getElementById("toName");
 sel.innerHTML = "";
 
 for(let i in players){
 if(i !== myId){
-sel.innerHTML += `<option value="${players[i].name}">${players[i].name}</option>`;
+sel.innerHTML += `<option value="${i}">${players[i].name}</option>`;
 }
 }
 
