@@ -1,126 +1,116 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monopoly / UK-Opoly Central Bank</title>
-  
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monopoly / UK-Opoly Bank System</title>
 
-  <style>
-    body { font-family:sans-serif; background:#121212; color:white; margin:0; padding:15px; text-align:center; }
-    .card { background:#1e1e1e; padding:15px; border-radius:10px; margin:10px 0; }
-    .grid { display:grid; grid-template-columns:2fr 1fr; gap:15px; max-width:1200px; margin:auto; }
-    .hide { display:none; }
-    button { background:#cf1020; color:white; border:none; padding:10px; border-radius:5px; width:100%; margin-top:5px; }
-    select, input { width:100%; padding:10px; margin-top:5px; }
-    .prop-row { display:flex; justify-content:space-between; padding:8px; border-left:4px solid white; background:#252525; margin:4px 0; }
-    .player-row { display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #333; }
-    .qr { background:white; display:inline-block; padding:10px; border-radius:8px; }
-  </style>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<style>
+body { font-family:sans-serif; background:#121212; color:white; margin:0; padding:15px; text-align:center; }
+.card { background:#1e1e1e; padding:15px; border-radius:10px; margin:10px 0; }
+.hide { display:none; }
+button { width:100%; padding:10px; margin-top:5px; background:#cf1020; color:white; border:none; border-radius:5px; }
+input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box; }
+.grid { display:grid; grid-template-columns:2fr 1fr; gap:10px; max-width:1100px; margin:auto; }
+.prop { padding:8px; background:#222; margin:4px 0; border-left:4px solid white; }
+</style>
 </head>
 
 <body>
 
-<h2>Monopoly / UK-Opoly Central Banking System</h2>
+<!-- ================= HOST ================= -->
+<div id="host">
+
+<h2>Monopoly Bank (HOST)</h2>
 
 <div class="card">
-  <label>Choose Board Type</label>
-  <select id="board-type">
-    <option value="classic">Classic Monopoly</option>
-    <option value="uk">UK-Opoly (Kentucky University)</option>
-  </select>
-
-  <button onclick="startHost()">Start Host Server</button>
+<label>Board Type</label>
+<select id="boardType">
+<option value="classic">Classic Monopoly</option>
+<option value="uk">UK-Opoly</option>
+</select>
+<button onclick="startHost()">Start Game</button>
 </div>
 
-<div id="host-view" class="hide">
+<div id="hostPanel" class="hide">
 
-  <div class="card">
-    <h3>Scan to Join Wallet</h3>
-    <div id="room-id"></div>
-    <div class="qr" id="qr"></div>
-  </div>
-
-  <div class="grid">
-
-    <div>
-      <div class="card">
-        <h3>Players</h3>
-        <div id="players"></div>
-      </div>
-
-      <div class="card">
-        <button onclick="saveGame()">Save</button>
-        <button onclick="loadGame()">Load</button>
-        <button onclick="location.reload()">Reset</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Properties</h3>
-      <div id="props"></div>
-    </div>
-
-  </div>
+<div class="card">
+<h3>Room Code</h3>
+<div id="roomText"></div>
+<div id="qr"></div>
 </div>
 
-<!-- PHONE -->
-<div id="phone-view" class="hide">
+<div class="grid">
+<div class="card">
+<h3>Players</h3>
+<div id="players"></div>
+</div>
 
-  <div class="card">
-    <h3>Join Game</h3>
-    <p id="room-status"></p>
+<div class="card">
+<h3>Properties</h3>
+<div id="properties"></div>
+</div>
+</div>
 
-    <select id="player-select">
-      <option value="P1">Player 1</option>
-      <option value="P2">Player 2</option>
-      <option value="P3">Player 3</option>
-      <option value="P4">Player 4</option>
-    </select>
+</div>
+</div>
 
-    <button onclick="connect()">Connect Wallet</button>
-  </div>
+<!-- ================= PHONE ================= -->
+<div id="phone" class="hide">
 
-  <div class="card hide" id="wallet">
-    <h3 id="my-name"></h3>
-    <h1 id="my-balance"></h1>
+<h3>Player Wallet</h3>
+<p id="roomStatus"></p>
 
-    <select id="send-to"></select>
-    <input id="amount" type="number" placeholder="Amount">
-    <button onclick="sendMoney()">Send Money</button>
+<div class="card hide" id="nameSetup">
+<h3>Enter Nickname</h3>
 
-    <hr>
+<input id="nick" placeholder="Your name">
 
-    <select id="scan"></select>
-    <div id="actions"></div>
-  </div>
+<select id="slot">
+<option value="P1">Slot 1</option>
+<option value="P2">Slot 2</option>
+<option value="P3">Slot 3</option>
+<option value="P4">Slot 4</option>
+<option value="P5">Slot 5</option>
+<option value="P6">Slot 6</option>
+</select>
+
+<button onclick="joinGame()">Join Game</button>
+</div>
+
+<div class="card hide" id="wallet">
+
+<h2 id="me"></h2>
+<h1 id="bal"></h1>
+
+<input id="toName" placeholder="Send to (nickname)">
+<input id="amt" type="number" placeholder="Amount">
+<button onclick="sendMoney()">Send Money</button>
+
+</div>
 
 </div>
 
 <script>
 
-/* ================= FULL BOARDS ================= */
+/* ================= BOARDS ================= */
 
-const classicBoard = {
-  MED:{name:"Mediterranean Ave",cost:60,rent:2,color:"#955436",house:50,owner:null,level:0},
-  BALT:{name:"Baltic Ave",cost:60,rent:4,color:"#955436",house:50,owner:null,level:0},
-  KEN:{name:"Kentucky Ave",cost:220,rent:18,color:"#ed1c24",house:150,owner:null,level:0},
-  BOARD:{name:"Boardwalk",cost:400,rent:50,color:"#0054a6",house:200,owner:null,level:0},
+const classic = {
+MED:{name:"Mediterranean Ave",cost:60,rent:2,color:"#955436",owner:null},
+BAL:{name:"Baltic Ave",cost:60,rent:4,color:"#955436",owner:null},
+KEN:{name:"Kentucky Ave",cost:220,rent:18,color:"#ed1c24",owner:null},
+BWD:{name:"Boardwalk",cost:400,rent:50,color:"#0054a6",owner:null}
 };
 
-/* FULL UK-OPOLY BOARD */
-const ukBoard = {
-  UK1:{name:"UK Main Campus",cost:120,rent:10,color:"#0033a0",house:80,owner:null,level:0},
-  UK2:{name:"Memorial Coliseum",cost:140,rent:12,color:"#0033a0",owner:null,level:0},
-  UK3:{name:"Wildcat Lodge",cost:160,rent:14,color:"#0055ff",owner:null,level:0},
-  UK4:{name:"UK Medical Center",cost:180,rent:16,color:"#001f5b",owner:null,level:0},
-  UK5:{name:"Student Union",cost:200,rent:18,color:"#0033a0",owner:null,level:0},
-  UK6:{name:"Rupp Arena District",cost:220,rent:20,color:"#0055ff",owner:null,level:0},
-  UK7:{name:"Engineering Quad",cost:240,rent:22,color:"#001f5b",owner:null,level:0},
-  UK8:{name:"Law Building",cost:260,rent:24,color:"#0033a0",owner:null,level:0},
-  UK9:{name:"Wildcat Stadium",cost:300,rent:28,color:"#0055ff",owner:null,level:0},
-  UK10:{name:"Championship Plaza",cost:350,rent:35,color:"#001f5b",owner:null,level:0}
+const uk = {
+UK1:{name:"UK Main Campus",cost:120,rent:10,color:"#0033a0",owner:null},
+UK2:{name:"Memorial Coliseum",cost:140,rent:12,color:"#0033a0",owner:null},
+UK3:{name:"Wildcat Lodge",cost:160,rent:14,color:"#0055ff",owner:null},
+UK4:{name:"Medical Center",cost:180,rent:16,color:"#001f5b",owner:null},
+UK5:{name:"Student Union",cost:200,rent:18,color:"#0033a0",owner:null},
+UK6:{name:"Rupp Arena",cost:220,rent:20,color:"#0055ff",owner:null}
 };
 
 /* ================= STATE ================= */
@@ -129,178 +119,181 @@ let peer, conn, roomId;
 let connections = [];
 
 let players = {
-  P1:{name:"Player 1",balance:1500,inJail:false},
-  P2:{name:"Player 2",balance:1500,inJail:false},
-  P3:{name:"Player 3",balance:1500,inJail:false},
-  P4:{name:"Player 4",balance:1500,inJail:false}
+P1:{name:"",balance:1500},
+P2:{name:"",balance:1500},
+P3:{name:"",balance:1500},
+P4:{name:"",balance:1500},
+P5:{name:"",balance:1500},
+P6:{name:"",balance:1500}
 };
 
 let properties = {};
-let boardType = "classic";
+let myId = "";
+
+/* ================= AUTO MODE ================= */
+
+const room = new URLSearchParams(location.search).get("room");
+
+if(room){
+document.getElementById("host").classList.add("hide");
+document.getElementById("phone").classList.remove("hide");
+document.getElementById("roomStatus").innerText = "Room: " + room;
+connectPhone(room);
+}
 
 /* ================= HOST ================= */
 
 function startHost(){
-  boardType = document.getElementById("board-type").value;
-  properties = boardType === "uk"
-    ? JSON.parse(JSON.stringify(ukBoard))
-    : JSON.parse(JSON.stringify(classicBoard));
 
-  roomId = "MONO-" + Math.random().toString(36).substring(2,6).toUpperCase();
+let type = document.getElementById("boardType").value;
+properties = JSON.parse(JSON.stringify(type==="uk"?uk:classic));
 
-  peer = new Peer(roomId);
+roomId = "MONO-" + Math.random().toString(36).substring(2,6).toUpperCase();
 
-  peer.on("open", () => {
-    document.getElementById("host-view").classList.remove("hide");
-    document.getElementById("room-id").innerText = roomId;
+peer = new Peer(roomId);
 
-    new QRCode(document.getElementById("qr"), {
-      text: window.location.href + "?room=" + roomId,
-      width:120,
-      height:120
-    });
-  });
+peer.on("open", () => {
+document.getElementById("hostPanel").classList.remove("hide");
+document.getElementById("roomText").innerText = roomId;
 
-  peer.on("connection", c => {
-    connections.push(c);
-    c.on("data", handleCmd);
-    c.on("open", broadcast);
-  });
+new QRCode(document.getElementById("qr"), {
+text: location.href + "?room=" + roomId,
+width:120,
+height:120
+});
+});
 
-  render();
-}
+peer.on("connection", c=>{
+connections.push(c);
+c.on("data", handleCmd);
+c.on("open", broadcast);
+});
 
-/* ================= COMMANDS ================= */
-
-function handleCmd(cmd){
-
-  if(cmd.type==="TRANSFER"){
-    if(players[cmd.from].balance>=cmd.amount){
-      players[cmd.from].balance-=cmd.amount;
-      if(cmd.to!=="BANK") players[cmd.to].balance+=cmd.amount;
-    }
-  }
-
-  if(cmd.type==="BUY"){
-    let p = properties[cmd.prop];
-    if(!p.owner && players[cmd.player].balance>=p.cost){
-      players[cmd.player].balance-=p.cost;
-      p.owner=cmd.player;
-    }
-  }
-
-  if(cmd.type==="UPGRADE"){
-    let p = properties[cmd.prop];
-    if(players[p.owner].balance>=p.house && p.level<5){
-      players[p.owner].balance-=p.house;
-      p.level++;
-    }
-  }
-
-  if(cmd.type==="RENT"){
-    let p = properties[cmd.prop];
-    let rent = p.rent*(p.level? p.level*2:1);
-    players[cmd.player].balance-=rent;
-    players[p.owner].balance+=rent;
-  }
-
-  broadcast();
-  render();
-}
-
-function broadcast(){
-  connections.forEach(c=>{
-    if(c.open) c.send({players,properties});
-  });
-}
-
-/* ================= RENDER ================= */
-
-function render(){
-
-  let pDiv = document.getElementById("players");
-  pDiv.innerHTML = "";
-
-  for(let id in players){
-    pDiv.innerHTML += `
-      <div class="player-row">
-        <span>${players[id].name}</span>
-        <span>$${players[id].balance}</span>
-      </div>`;
-  }
-
-  let propDiv = document.getElementById("props");
-  propDiv.innerHTML = "";
-
-  for(let id in properties){
-    let p = properties[id];
-    propDiv.innerHTML += `
-      <div class="prop-row" style="border-left-color:${p.color}">
-        <div><b>${p.name}</b><br>Owner: ${p.owner||"Bank"}</div>
-        <div>$${p.cost}</div>
-      </div>`;
-  }
+renderHost();
 }
 
 /* ================= PHONE ================= */
 
-function connect(){
-  let room = new URLSearchParams(location.search).get("room");
-  if(!room) return alert("No room found");
+function connectPhone(room){
 
-  let id = document.getElementById("player-select").value;
+peer = new Peer();
 
-  peer = new Peer();
+peer.on("open", ()=>{
+conn = peer.connect(room);
 
-  peer.on("open",()=>{
-    conn = peer.connect(room);
+conn.on("open", ()=>{
+document.getElementById("nameSetup").classList.remove("hide");
+});
 
-    conn.on("open",()=>{
-      document.getElementById("wallet").classList.remove("hide");
-      document.getElementById("room-status").innerText="Connected";
-    });
+conn.on("data", data=>{
+players = data.players;
+properties = data.properties;
 
-    conn.on("data", data=>{
-      players = data.players;
-      properties = data.properties;
-      renderPhone(id);
-    });
-  });
+if(myId){
+document.getElementById("wallet").classList.remove("hide");
+renderPhone();
 }
+});
+});
+}
+
+/* ================= JOIN ================= */
+
+function joinGame(){
+
+myId = document.getElementById("slot").value;
+let name = document.getElementById("nick").value;
+
+players[myId].name = name;
+
+conn.send({
+type:"SET_NAME",
+player:myId,
+name:name
+});
+
+document.getElementById("nameSetup").classList.add("hide");
+document.getElementById("wallet").classList.remove("hide");
+
+renderPhone();
+}
+
+/* ================= SEND MONEY ================= */
 
 function sendMoney(){
-  let to = document.getElementById("send-to").value;
-  let amt = parseInt(document.getElementById("amount").value);
-  conn.send({type:"TRANSFER",from:myId,to,amount:amt});
+
+let to = document.getElementById("toName").value.trim();
+let amt = parseInt(document.getElementById("amt").value);
+
+if(!amt || amt<=0) return;
+
+conn.send({
+type:"TRANSFER_NAME",
+from:myId,
+toName:to,
+amount:amt
+});
 }
 
-let myId;
+/* ================= HOST COMMANDS ================= */
 
-function renderPhone(id){
-  myId=id;
-  let me = players[id];
+function handleCmd(cmd){
 
-  document.getElementById("my-name").innerText = me.name;
-  document.getElementById("my-balance").innerText = "$"+me.balance;
-
-  let sel = document.getElementById("send-to");
-  sel.innerHTML = `<option value="BANK">Bank</option>`;
-
-  for(let p in players){
-    if(p!==id) sel.innerHTML += `<option value="${p}">${players[p].name}</option>`;
-  }
+if(cmd.type==="SET_NAME"){
+players[cmd.player].name = cmd.name;
 }
 
-/* ================= SAVE ================= */
+if(cmd.type==="TRANSFER_NAME"){
 
-function saveGame(){
-  localStorage.setItem("mono",JSON.stringify({players,properties}));
-  alert("Saved");
+let from = players[cmd.from];
+
+let toId = Object.keys(players).find(p=>
+players[p].name.toLowerCase() === cmd.toName.toLowerCase()
+);
+
+if(toId && from.balance>=cmd.amount){
+from.balance -= cmd.amount;
+players[toId].balance += cmd.amount;
+}
 }
 
-function loadGame(){
-  let d = JSON.parse(localStorage.getItem("mono"));
-  if(d){ players=d.players; properties=d.properties; render(); }
+broadcast();
+renderHost();
+}
+
+/* ================= RENDER ================= */
+
+function renderHost(){
+
+let p = document.getElementById("players");
+p.innerHTML = "";
+
+for(let i in players){
+p.innerHTML += `<div>${players[i].name||i} - $${players[i].balance}</div>`;
+}
+
+let pr = document.getElementById("properties");
+pr.innerHTML = "";
+
+for(let i in properties){
+pr.innerHTML += `<div class="prop">${properties[i].name}</div>`;
+}
+}
+
+function renderPhone(){
+
+let me = players[myId];
+
+document.getElementById("me").innerText = me.name;
+document.getElementById("bal").innerText = "$" + me.balance;
+}
+
+/* ================= BROADCAST ================= */
+
+function broadcast(){
+connections.forEach(c=>{
+if(c.open) c.send({players,properties});
+});
 }
 
 </script>
