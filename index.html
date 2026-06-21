@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monopoly / UK-Opoly Central Bank</title>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    body { font-family: sans-serif; background:#121212; color:white; margin:0; padding:15px; text-align:center; }
+    .card { background:#1e1e1e; padding:15px; border-radius:10px; margin:10px 0; }
+    .grid { display:grid; grid-template-columns:2fr 1fr; gap:15px; max-width:1200px; margin:auto; }
+    .hide { display:none; }
+    button { background:#cf1020; color:white; border:none; padding:10px; border-radius:5px; width:100%; margin-top:5px; }
+    select, input { width:100%; padding:10px; margin-top:5px; }
+    .prop-row { display:flex; justify-content:space-between; padding:8px; border-left:4px solid white; background:#252525; margin:4px 0; }
+    .player-row { display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #333; }
+    .qr { background:white; display:inline-block; padding:10px; border-radius:8px; }
+  </style>
+</head>
+
+<body>
+
+<h2>Monopoly / UK-Opoly Central Banking System</h2>
+
+<div class="card">
+  <label>Choose Board Type</label>
+  <select id="board-type">
+    <option value="classic">Classic Monopoly</option>
+    <option value="uk">UK-Opoly (Kentucky University)</option>
+  </select>
+
+  <button onclick="startHost()">Start Host Server</button>
+</div>
+
+<div id="host-view" class="hide">
+
+  <div class="card">
+    <h3>Scan to Join Wallet</h3>
+    <div id="room-id">Connecting...</div>
+    <div class="qr" id="qr"></div>
+  </div>
+
+  <div class="grid">
+
+    <div>
+      <div class="card">
+        <h3>Players</h3>
+        <div id="players"></div>
+      </div>
+
+      <div class="card">
+        <button onclick="saveGame()">Save</button>
+        <button onclick="loadGame()">Load</button>
+        <button onclick="location.reload()">Reset</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Properties</h3>
+      <div id="props"></div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- PHONE CONTROLLER -->
+<div id="phone-view" class="hide">
+
+  <div class="card">
+    <h3>Join Game</h3>
+    <p id="room-status"></p>
+
+    <select id="player-select">
+      <option value="P1">Player 1</option>
+      <option value="P2">Player 2</option>
+      <option value="P3">Player 3</option>
+      <option value="P4">Player 4</option>
+    </select>
+
+    <button onclick="connect()">Connect Wallet</button>
+  </div>
+
+  <div class="card hide" id="wallet">
+    <h3 id="my-name"></h3>
+    <h1 id="my-balance"></h1>
+
+    <select id="send-to"></select>
+    <input id="amount" type="number" placeholder="Amount">
+    <button onclick="send()">Send Money</button>
+
+    <hr>
+
+    <select id="scan"></select>
+    <div id="actions"></div>
+  </div>
+
+</div>
+
+<script>
+
+/* ================= BOARD DATA ================= */
+
+const classicBoard = {
+  MED:{name:"Mediterranean Ave",cost:60,rent:2,color:"#955436",house:50,owner:null,level:0},
+  BALT:{name:"Baltic Ave",cost:60,rent:4,color:"#955436",house:50,owner:null,level:0},
+  KEN:{name:"Kentucky Ave",cost:220,rent:18,color:"#ed1c24",house:150,owner:null,level:0},
+  BOARD:{name:"Boardwalk",cost:400,rent:50,color:"#0054a6",house:200,owner:null,level:0},
+};
+
+const ukBoard = {
+  UK1:{name:"UK Campus Main Hall",cost:120,rent:10,color:"#0033a0",house:80,owner:null,level:0},
+  UK2:{name:"Wildcat Stadium",cost:200,rent:20,color:"#0033a0",house:120,owner:null,level:0},
+  UK3:{name:"Lexington Research Center",cost:260,rent:25,color:"#0055ff",house:150,owner:null,level:0},
+  UK4:{name:"Kentucky Medical Pavilion",cost:320,rent:35,color:"#001f5b",house:200,owner:null,level:0},
+};
+
+/* ================= STATE ================= */
+
+let peer;
+let conn;
+let roomId;
+let connections = [];
+
+let players = {
+  P1:{name:"Player 1",balance:1500,inJail:false},
+  P2:{name:"Player 2",balance:1500,inJail:false},
+  P3:{name:"Player 3",balance:1500,inJail:false},
+  P4:{name:"Player 4",balance:1500,inJail:false}
+};
+
+let properties = {};
+let boardType = "classic";
+
+/* ================= HOST ================= */
+
+function startHost(){
+  boardType = document.getElementById("board-type").value;
+  properties = boardType === "uk" ? structuredClone(ukBoard) : structuredClone(classicBoard);
+
+  roomId = "MONO-" + Math.random().toString(36).substring(2,6).toUpperCase();
+
+  peer = new Peer(roomId);
+
+  peer.on("open", () => {
+    document.getElementById("host-view").classList.remove("hide");
+    document.getElementById("room-id").innerText = roomId;
+
+    new QRCode(document.getElementById("qr"), {
+      text: window.location.href + "?room=" + roomId,
+      width:120,
+      height:120
+    });
+  });
+
+  peer.on("connection", c => {
+    connections.push(c);
+    c.on("data", handleCmd);
+    c.on("open", broadcast);
+  });
+
+  render();
+}
+
+function handleCmd(cmd){
+  if(cmd.type==="TRANSFER"){
+    if(players[cmd.from].balance>=cmd.amount){
+      players[cmd.from].balance-=cmd.amount;
+      if(cmd.to!=="BANK") players[cmd.to].balance+=cmd.amount;
+    }
+  }
+
+  if(cmd.type==="BUY"){
+    let p = properties[cmd.prop];
+    if(!p.owner && players[cmd.player].balance>=p.cost){
+      players[cmd.player].balance-=p.cost;
+      p.owner=cmd.player;
+    }
+  }
+
+  if(cmd.type==="UPGRADE"){
+    let p = properties[cmd.prop];
+    if(players[p.owner].balance>=p.house && p.level<5){
+      players[p.owner].balance-=p.house;
+      p.level++;
+    }
+  }
+
+  if(cmd.type==="RENT"){
+    let p = properties[cmd.prop];
+    let rent = p.rent*(p.level? p.level*2:1);
+    players[cmd.player].balance-=rent;
+    players[p.owner].balance+=rent;
+  }
+
+  broadcast();
+  render();
+}
+
+function broadcast(){
+  connections.forEach(c=>{
+    if(c.open) c.send({players,properties,boardType});
+  });
+}
+
+/* ================= RENDER HOST ================= */
+
+function render(){
+  let pDiv = document.getElementById("players");
+  pDiv.innerHTML = "";
+
+  for(let id in players){
+    pDiv.innerHTML += `
+      <div class="player-row">
+        <span>${players[id].name}${players[id].inJail?" (JAIL)":""}</span>
+        <span>$${players[id].balance}</span>
+      </div>`;
+  }
+
+  let propDiv = document.getElementById("props");
+  propDiv.innerHTML = "";
+
+  for(let id in properties){
+    let p = properties[id];
+    propDiv.innerHTML += `
+      <div class="prop-row" style="border-left-color:${p.color}">
+        <div><b>${p.name}</b><br>Owner: ${p.owner||"Bank"}</div>
+        <div>$${p.cost}</div>
+      </div>`;
+  }
+}
+
+/* ================= PHONE ================= */
+
+function connect(){
+  let room = new URLSearchParams(location.search).get("room");
+  if(!room) return alert("No room detected");
+
+  let id = document.getElementById("player-select").value;
+
+  peer = new Peer();
+  peer.on("open",()=>{
+    conn = peer.connect(room);
+
+    conn.on("open",()=>{
+      document.getElementById("wallet").classList.remove("hide");
+      document.getElementById("room-status").innerText="Connected";
+    });
+
+    conn.on("data", data=>{
+      players = data.players;
+      properties = data.properties;
+      renderPhone(id);
+    });
+  });
+}
+
+function send(obj){ if(conn) conn.send(obj); }
+
+function sendMoney(){
+  let to = document.getElementById("send-to").value;
+  let amt = parseInt(document.getElementById("amount").value);
+  send({type:"TRANSFER",from:myId,to,amount:amt});
+}
+
+/* ================= PHONE RENDER ================= */
+
+let myId;
+
+function renderPhone(id){
+  myId=id;
+  let me = players[id];
+
+  document.getElementById("my-name").innerText = me.name;
+  document.getElementById("my-balance").innerText = "$"+me.balance;
+
+  let sel = document.getElementById("send-to");
+  sel.innerHTML = `<option value="BANK">Bank</option>`;
+  for(let p in players){
+    if(p!==id) sel.innerHTML += `<option value="${p}">${players[p].name}</option>`;
+  }
+}
+
+/* ================= SAVE ================= */
+
+function saveGame(){
+  localStorage.setItem("mono",JSON.stringify({players,properties}));
+  alert("Saved");
+}
+
+function loadGame(){
+  let d = JSON.parse(localStorage.getItem("mono"));
+  if(d){ players=d.players; properties=d.properties; broadcast(); render(); }
+}
+
+</script>
+
+</body>
+</html>
