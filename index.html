@@ -34,7 +34,7 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 </div>
 
 <div class="card">
-<h3>Players</h3>
+<h3>Accounts</h3>
 <div id="players"></div>
 </div>
 
@@ -88,25 +88,17 @@ P2:{name:"",balance:1500},
 P3:{name:"",balance:1500},
 P4:{name:"",balance:1500},
 P5:{name:"",balance:1500},
-P6:{name:"",balance:1500}
+P6:{name:"",balance:1500},
+
+// 🏦 BANK (new real account)
+P7:{name:"BANK",balance:0}
 };
 
 let peer, conn, roomId;
 let connections = [];
 let myId = "";
 
-/* ================= AUTO MODE ================= */
-
-const room = new URLSearchParams(location.search).get("room");
-
-if(room){
-document.getElementById("host").classList.add("hide");
-document.getElementById("phone").classList.remove("hide");
-document.getElementById("roomStatus").innerText = "Room: " + room;
-connectPhone(room);
-}
-
-/* ================= HOST ================= */
+/* ================= HOST START ================= */
 
 function startHost(){
 
@@ -118,6 +110,9 @@ peer.on("open", () => {
 
 document.getElementById("hostPanel").classList.remove("hide");
 document.getElementById("roomText").innerText = roomId;
+
+/* BANK STARTING MONEY = 6 players × 1500 = 9000 */
+players.P7.balance = 9000;
 
 new QRCode(document.getElementById("qr"), {
 text: location.href + "?room=" + roomId,
@@ -136,7 +131,16 @@ c.on("open", broadcast);
 renderHost();
 }
 
-/* ================= PHONE ================= */
+/* ================= PHONE CONNECT ================= */
+
+const room = new URLSearchParams(location.search).get("room");
+
+if(room){
+document.getElementById("host").classList.add("hide");
+document.getElementById("phone").classList.remove("hide");
+document.getElementById("roomStatus").innerText = "Room: " + room;
+connectPhone(room);
+}
 
 function connectPhone(room){
 
@@ -181,7 +185,7 @@ document.getElementById("wallet").classList.remove("hide");
 renderPhone();
 }
 
-/* ================= SEND ================= */
+/* ================= SEND MONEY ================= */
 
 function sendMoney(){
 
@@ -191,14 +195,14 @@ let amt = parseInt(document.getElementById("amt").value);
 if(!amt || amt<=0) return;
 
 conn.send({
-type:"TRANSFER_NAME",
+type:"TRANSFER",
 from:myId,
 toName:to,
 amount:amt
 });
 }
 
-/* ================= HOST COMMANDS ================= */
+/* ================= HOST LOGIC ================= */
 
 function handleCmd(cmd){
 
@@ -206,25 +210,17 @@ if(cmd.type==="SET_NAME"){
 players[cmd.player].name = cmd.name;
 }
 
-/* ===== FIXED BANK + PLAYER TRANSFER ===== */
-if(cmd.type==="TRANSFER_NAME"){
+/* MONEY TRANSFER (NOW BANK IS REAL PLAYER P7) */
+if(cmd.type==="TRANSFER"){
 
 let from = players[cmd.from];
-let target = cmd.toName.toLowerCase();
+let targetName = cmd.toName.toLowerCase();
 
 if(from.balance >= cmd.amount){
 
-// BANK CASE
-if(target === "bank"){
-from.balance -= cmd.amount;
-broadcast();
-renderHost();
-return;
-}
-
-// PLAYER CASE
+// find recipient (player OR bank)
 let toId = Object.keys(players).find(p =>
-players[p].name.toLowerCase() === target
+players[p].name.toLowerCase() === targetName
 );
 
 if(toId){
@@ -238,22 +234,22 @@ broadcast();
 renderHost();
 }
 
-/* ================= RENDER HOST ================= */
+/* ================= HOST UI ================= */
 
 function renderHost(){
 
-let p = document.getElementById("players");
-p.innerHTML = "";
+let div = document.getElementById("players");
+div.innerHTML = "";
 
 for(let i in players){
-p.innerHTML += `
-<div style="margin:5px 0; padding:8px; background:#222;">
-<b>${players[i].name || i}</b> - $${players[i].balance}
+div.innerHTML += `
+<div style="margin:5px; padding:8px; background:#222;">
+<b>${players[i].name}</b> - $${players[i].balance}
 </div>`;
 }
 }
 
-/* ================= RENDER PHONE ================= */
+/* ================= PHONE UI ================= */
 
 function renderPhone(){
 
@@ -262,9 +258,9 @@ let me = players[myId];
 document.getElementById("me").innerText = me.name;
 document.getElementById("bal").innerText = "$" + me.balance;
 
-/* dropdown */
+/* dropdown includes BANK now */
 let sel = document.getElementById("toName");
-sel.innerHTML = `<option value="Bank">Bank</option>`;
+sel.innerHTML = "";
 
 for(let i in players){
 if(i !== myId){
