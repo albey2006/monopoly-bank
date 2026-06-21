@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Monopoly Bank System</title>
+<title>UK-Opoly + Monopoly Bank System</title>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -21,7 +21,7 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 
 <!-- HOST -->
 <div id="host">
-<h2>Monopoly Banker Core</h2>
+<h2>Opoly Banking System</h2>
 
 <div class="card">
 <button onclick="startHost()">Start Game</button>
@@ -36,6 +36,14 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 </div>
 
 <div class="card">
+<h3>Game Mode</h3>
+<select id="mode">
+<option value="monopoly">Monopoly</option>
+<option value="ukopoly">UK-Opoly</option>
+</select>
+</div>
+
+<div class="card">
 <h3>Players</h3>
 <div id="players"></div>
 </div>
@@ -47,15 +55,12 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 <input id="bankAmt" type="number" placeholder="Amount">
 <button onclick="bankPay()">Send Money From Bank</button>
 
+<button onclick="passGo()">Award Pass GO (+$200)</button>
+
 </div>
 
 <div class="card">
 <h3>Transaction Log</h3>
-
-<button class="smallbtn" onclick="setFilter('all')">All</button>
-<button class="smallbtn" onclick="setFilter('bank')">Bank Only</button>
-<button class="smallbtn" onclick="setFilter('players')">Players Only</button>
-
 <div id="log"></div>
 </div>
 
@@ -75,12 +80,12 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 <input id="nick" placeholder="Your name">
 
 <select id="slot">
-<option value="P1">Slot 1</option>
-<option value="P2">Slot 2</option>
-<option value="P3">Slot 3</option>
-<option value="P4">Slot 4</option>
-<option value="P5">Slot 5</option>
-<option value="P6">Slot 6</option>
+<option value="P1">Player 1</option>
+<option value="P2">Player 2</option>
+<option value="P3">Player 3</option>
+<option value="P4">Player 4</option>
+<option value="P5">Player 5</option>
+<option value="P6">Player 6</option>
 </select>
 
 <button onclick="joinGame()">Join</button>
@@ -92,7 +97,6 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 <h2 id="me"></h2>
 <h1 id="bal"></h1>
 
-<!-- 🚫 ONLY PLAYERS (NO BANK) -->
 <select id="toName"></select>
 <input id="amt" type="number" placeholder="Amount">
 <button onclick="sendMoney()">Send Money</button>
@@ -103,7 +107,7 @@ input, select { width:100%; padding:10px; margin-top:5px; box-sizing:border-box;
 
 <script>
 
-/* ================= PLAYERS ================= */
+/* ================= CORE ================= */
 
 let players = {
 P1:{name:"",balance:1500},
@@ -114,16 +118,13 @@ P5:{name:"",balance:1500},
 P6:{name:"",balance:1500}
 };
 
-/* 🏦 BANK (SYSTEM ONLY) */
-let bank = { balance: 9000 };
+let bank = { balance: 100000 }; // large system bank
 
 let peer, conn, roomId;
 let connections = [];
 let myId = "";
 
-/* LOG */
 let transactions = [];
-let logFilter = "all";
 
 /* ================= HOST ================= */
 
@@ -209,14 +210,14 @@ document.getElementById("wallet").classList.remove("hide");
 renderPhone();
 }
 
-/* ================= PLAYER SEND (NO BANK ACCESS) ================= */
+/* ================= PLAYER SEND ================= */
 
 function sendMoney(){
 
 let to = document.getElementById("toName").value;
 let amt = parseInt(document.getElementById("amt").value);
 
-if(!amt || amt<=0) return;
+if(!amt || amt <= 0) return;
 
 conn.send({
 type:"TRANSFER",
@@ -226,23 +227,36 @@ amount:amt
 });
 }
 
-/* ================= BANK SEND ================= */
+/* ================= PASS GO ================= */
+
+function passGo(){
+let p = players[myId];
+if(!p) return;
+
+p.balance += 200;
+addLog("BANK", p.name, 200);
+broadcast();
+renderHost();
+renderPhone();
+}
+
+/* ================= BANK PAY ================= */
 
 function bankPay(){
 
 let to = document.getElementById("bankTo").value;
 let amt = parseInt(document.getElementById("bankAmt").value);
 
-if(!amt || amt<=0) return;
+if(!amt || amt <= 0) return;
 
 let target = players[to];
 
-if(bank.balance >= amt && target){
+if(target){
 
-bank.balance -= amt;
 target.balance += amt;
 
 addLog("BANK", target.name, amt);
+
 broadcast();
 renderHost();
 }
@@ -256,7 +270,7 @@ if(cmd.type==="SET_NAME"){
 players[cmd.player].name = cmd.name;
 }
 
-/* PLAYER → PLAYER ONLY */
+/* PLAYER → PLAYER */
 if(cmd.type==="TRANSFER"){
 
 let from = players[cmd.from];
@@ -277,15 +291,10 @@ renderHost();
 
 /* ================= LOG ================= */
 
-function addLog(from, to, amount){
+function addLog(from,to,amount){
 
 transactions.unshift({from,to,amount});
-if(transactions.length > 30) transactions.pop();
-renderLog();
-}
-
-function setFilter(f){
-logFilter = f;
+if(transactions.length > 40) transactions.pop();
 renderLog();
 }
 
@@ -295,15 +304,6 @@ let log = document.getElementById("log");
 log.innerHTML = "";
 
 transactions.forEach(t=>{
-
-if(logFilter==="bank"){
-if(t.from!=="BANK" && t.to!=="BANK") return;
-}
-
-if(logFilter==="players"){
-if(t.from==="BANK" || t.to==="BANK") return;
-}
-
 log.innerHTML += `
 <div style="text-align:left; padding:5px; border-bottom:1px solid #333;">
 ${t.from} → ${t.to} $${t.amount}
@@ -326,7 +326,7 @@ div.innerHTML += `
 </div>`;
 }
 
-/* ONLY PLAYERS IN BANK DROPDOWN */
+/* dropdown */
 let sel = document.getElementById("bankTo");
 if(sel){
 sel.innerHTML = "";
@@ -347,7 +347,7 @@ let me = players[myId];
 document.getElementById("me").innerText = me.name;
 document.getElementById("bal").innerText = "$" + me.balance;
 
-/* ONLY PLAYERS (NO BANK OPTION) */
+/* ONLY PLAYERS */
 let sel = document.getElementById("toName");
 sel.innerHTML = "";
 
