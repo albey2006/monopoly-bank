@@ -8,7 +8,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <style>
-    body { font-family: sans-serif; background:#121212; color:white; margin:0; padding:15px; text-align:center; }
+    body { font-family:sans-serif; background:#121212; color:white; margin:0; padding:15px; text-align:center; }
     .card { background:#1e1e1e; padding:15px; border-radius:10px; margin:10px 0; }
     .grid { display:grid; grid-template-columns:2fr 1fr; gap:15px; max-width:1200px; margin:auto; }
     .hide { display:none; }
@@ -38,7 +38,7 @@
 
   <div class="card">
     <h3>Scan to Join Wallet</h3>
-    <div id="room-id">Connecting...</div>
+    <div id="room-id"></div>
     <div class="qr" id="qr"></div>
   </div>
 
@@ -65,8 +65,7 @@
   </div>
 </div>
 
-
-<!-- PHONE CONTROLLER -->
+<!-- PHONE -->
 <div id="phone-view" class="hide">
 
   <div class="card">
@@ -89,7 +88,7 @@
 
     <select id="send-to"></select>
     <input id="amount" type="number" placeholder="Amount">
-    <button onclick="send()">Send Money</button>
+    <button onclick="sendMoney()">Send Money</button>
 
     <hr>
 
@@ -101,7 +100,7 @@
 
 <script>
 
-/* ================= BOARD DATA ================= */
+/* ================= FULL BOARDS ================= */
 
 const classicBoard = {
   MED:{name:"Mediterranean Ave",cost:60,rent:2,color:"#955436",house:50,owner:null,level:0},
@@ -110,18 +109,23 @@ const classicBoard = {
   BOARD:{name:"Boardwalk",cost:400,rent:50,color:"#0054a6",house:200,owner:null,level:0},
 };
 
+/* FULL UK-OPOLY BOARD */
 const ukBoard = {
-  UK1:{name:"UK Campus Main Hall",cost:120,rent:10,color:"#0033a0",house:80,owner:null,level:0},
-  UK2:{name:"Wildcat Stadium",cost:200,rent:20,color:"#0033a0",house:120,owner:null,level:0},
-  UK3:{name:"Lexington Research Center",cost:260,rent:25,color:"#0055ff",house:150,owner:null,level:0},
-  UK4:{name:"Kentucky Medical Pavilion",cost:320,rent:35,color:"#001f5b",house:200,owner:null,level:0},
+  UK1:{name:"UK Main Campus",cost:120,rent:10,color:"#0033a0",house:80,owner:null,level:0},
+  UK2:{name:"Memorial Coliseum",cost:140,rent:12,color:"#0033a0",owner:null,level:0},
+  UK3:{name:"Wildcat Lodge",cost:160,rent:14,color:"#0055ff",owner:null,level:0},
+  UK4:{name:"UK Medical Center",cost:180,rent:16,color:"#001f5b",owner:null,level:0},
+  UK5:{name:"Student Union",cost:200,rent:18,color:"#0033a0",owner:null,level:0},
+  UK6:{name:"Rupp Arena District",cost:220,rent:20,color:"#0055ff",owner:null,level:0},
+  UK7:{name:"Engineering Quad",cost:240,rent:22,color:"#001f5b",owner:null,level:0},
+  UK8:{name:"Law Building",cost:260,rent:24,color:"#0033a0",owner:null,level:0},
+  UK9:{name:"Wildcat Stadium",cost:300,rent:28,color:"#0055ff",owner:null,level:0},
+  UK10:{name:"Championship Plaza",cost:350,rent:35,color:"#001f5b",owner:null,level:0}
 };
 
 /* ================= STATE ================= */
 
-let peer;
-let conn;
-let roomId;
+let peer, conn, roomId;
 let connections = [];
 
 let players = {
@@ -138,7 +142,9 @@ let boardType = "classic";
 
 function startHost(){
   boardType = document.getElementById("board-type").value;
-  properties = boardType === "uk" ? structuredClone(ukBoard) : structuredClone(classicBoard);
+  properties = boardType === "uk"
+    ? JSON.parse(JSON.stringify(ukBoard))
+    : JSON.parse(JSON.stringify(classicBoard));
 
   roomId = "MONO-" + Math.random().toString(36).substring(2,6).toUpperCase();
 
@@ -164,7 +170,10 @@ function startHost(){
   render();
 }
 
+/* ================= COMMANDS ================= */
+
 function handleCmd(cmd){
+
   if(cmd.type==="TRANSFER"){
     if(players[cmd.from].balance>=cmd.amount){
       players[cmd.from].balance-=cmd.amount;
@@ -201,20 +210,21 @@ function handleCmd(cmd){
 
 function broadcast(){
   connections.forEach(c=>{
-    if(c.open) c.send({players,properties,boardType});
+    if(c.open) c.send({players,properties});
   });
 }
 
-/* ================= RENDER HOST ================= */
+/* ================= RENDER ================= */
 
 function render(){
+
   let pDiv = document.getElementById("players");
   pDiv.innerHTML = "";
 
   for(let id in players){
     pDiv.innerHTML += `
       <div class="player-row">
-        <span>${players[id].name}${players[id].inJail?" (JAIL)":""}</span>
+        <span>${players[id].name}</span>
         <span>$${players[id].balance}</span>
       </div>`;
   }
@@ -236,11 +246,12 @@ function render(){
 
 function connect(){
   let room = new URLSearchParams(location.search).get("room");
-  if(!room) return alert("No room detected");
+  if(!room) return alert("No room found");
 
   let id = document.getElementById("player-select").value;
 
   peer = new Peer();
+
   peer.on("open",()=>{
     conn = peer.connect(room);
 
@@ -257,15 +268,11 @@ function connect(){
   });
 }
 
-function send(obj){ if(conn) conn.send(obj); }
-
 function sendMoney(){
   let to = document.getElementById("send-to").value;
   let amt = parseInt(document.getElementById("amount").value);
-  send({type:"TRANSFER",from:myId,to,amount:amt});
+  conn.send({type:"TRANSFER",from:myId,to,amount:amt});
 }
-
-/* ================= PHONE RENDER ================= */
 
 let myId;
 
@@ -278,6 +285,7 @@ function renderPhone(id){
 
   let sel = document.getElementById("send-to");
   sel.innerHTML = `<option value="BANK">Bank</option>`;
+
   for(let p in players){
     if(p!==id) sel.innerHTML += `<option value="${p}">${players[p].name}</option>`;
   }
@@ -292,7 +300,7 @@ function saveGame(){
 
 function loadGame(){
   let d = JSON.parse(localStorage.getItem("mono"));
-  if(d){ players=d.players; properties=d.properties; broadcast(); render(); }
+  if(d){ players=d.players; properties=d.properties; render(); }
 }
 
 </script>
